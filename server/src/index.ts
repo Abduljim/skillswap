@@ -9,7 +9,7 @@ const app = createApp();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: env.clientUrl, credentials: true },
+  cors: { origin: env.corsOrigins, credentials: true },
 });
 
 setIo(io);

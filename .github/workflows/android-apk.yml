@@ -43,6 +43,10 @@ jobs:
 
       - name: Build web app
         run: npm run build
+        env:
+          # The deployed API the Android app talks to. Override on a release
+          # build, or change the default once the server has a public URL.
+          VITE_API_URL: ${{ vars.ANDROID_API_URL || '' }}
 
       - name: Generate Android project
         run: npx cap add android
@@ -51,8 +55,9 @@ jobs:
         run: |
           mkdir -p android/app/src/main/java/com/skillswap/billing
           cp native/PlayBillingBridge.java android/app/src/main/java/com/skillswap/billing/
-          # Bundle the billing bridge into the packaged web assets
-          cp native/billing-bridge.js android/app/src/main/assets/public/
+          # The index.html references /android-billing.js; place the bridge in
+          # the web build output so it is bundled into the APK's assets.
+          cp native/billing-bridge.js dist/android-billing.js
 
       - name: Register plugin in MainActivity
         run: |

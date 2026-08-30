@@ -4,8 +4,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * API origin. On the web this is empty (same-origin + Vite proxy); inside the
+ * Android app (Capacitor) it must point at the deployed server, configured at
+ * build time via VITE_API_URL.
+ */
+export const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } })
+  .env?.VITE_API_URL || '';
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     credentials: 'include',
     ...options,

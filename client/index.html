@@ -14,6 +14,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Android only: defines window.AndroidBilling before the app bundle
+         loads (the file is only packaged inside the APK; on the web this
+         404s silently and billing falls back to its no-op path). -->
+    <script src="/android-billing.js" defer></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
