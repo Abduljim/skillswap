@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, setToken } from '../api';
 import { useAuth } from '../auth';
 
 function Shell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
@@ -31,7 +31,8 @@ export function Login() {
     setBusy(true);
     setError('');
     try {
-      await api.post('/auth/login', { email, password });
+      const data = await api.post<{ user: { id: string } & Record<string, unknown>; token?: string }>('/auth/login', { email, password });
+      if (data.token) setToken(data.token);
       await refresh();
       navigate('/dashboard');
     } catch (err) {
@@ -78,7 +79,8 @@ export function Signup() {
     setBusy(true);
     setError('');
     try {
-      await api.post('/auth/signup', { displayName, email, password });
+      const data = await api.post<{ user: { id: string } & Record<string, unknown>; token?: string }>('/auth/signup', { displayName, email, password });
+      if (data.token) setToken(data.token);
       await refresh();
       navigate('/onboarding');
     } catch (err) {

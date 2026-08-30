@@ -44,7 +44,8 @@ router.post('/signup', validate(signupSchema), async (req, res) => {
   const token = signToken(publicUser(user));
   setAuthCookie(res, token);
   trackEvent(user.id, 'signup_completed', {}).catch(() => {});
-  res.status(201).json({ user: publicUser(user) });
+  // Bearer token for the native app (web keeps using the HTTP-only cookie).
+  res.status(201).json({ user: publicUser(user), token });
 });
 
 router.post('/login', validate(loginSchema), async (req, res) => {
@@ -56,7 +57,8 @@ router.post('/login', validate(loginSchema), async (req, res) => {
   if (!user.isActive) throw new HttpError(403, 'This account has been deactivated');
   const token = signToken(publicUser(user));
   setAuthCookie(res, token);
-  res.json({ user: publicUser(user) });
+  // Bearer token for the native app (web keeps using the HTTP-only cookie).
+  res.json({ user: publicUser(user), token });
 });
 
 router.get('/token', requireAuth, async (req, res) => {

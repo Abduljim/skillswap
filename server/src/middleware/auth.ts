@@ -49,8 +49,18 @@ export function clearAuthCookie(res: Response) {
   });
 }
 
-/** Requires a valid authenticated user. */
+/** Requires a valid authenticated user (Bearer token or cookie). */
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Native app / cross-origin clients send a Bearer token.
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Bearer ')) {
+    const user = verifyToken(header.slice(7));
+    if (user) {
+      req.user = user;
+      return next();
+    }
+  }
+  // Same-origin web clients use the HTTP-only cookie.
   const raw = (req.cookies as Record<string, string> | undefined)?.[COOKIE_NAME];
   const user = raw ? verifyToken(raw) : null;
   if (!user) {

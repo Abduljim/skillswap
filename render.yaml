@@ -1,0 +1,53 @@
+# Render.com deployment blueprint for SkillSwap.
+#
+# One-time setup:
+#   1. Push this repo to GitHub (done).
+#   2. In Render Dashboard: New → Blueprint → pick Abduljim/skillswap.
+#   3. Add the required environment variables when prompted.
+#
+# The Postgres database lives on Neon (DATABASE_URL already in use) — no
+# managed Postgres is provisioned here.
+services:
+  - type: web
+    name: skillswap-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        sync: false # set in dashboard (use your Neon pooled connection string)
+      - key: JWT_SECRET
+        generateValue: true # or set your own long random string
+      - key: CLIENT_URL
+        sync: false # e.g. https://skillswap.onrender.com (client) or your custom domain
+      - key: SERVER_URL
+        sync: false # e.g. https://skillswap-api.onrender.com
+      - key: EXTRA_CORS_ORIGINS
+        sync: false # e.g. https://skillswap-client.onrender.com
+      # Google Play verification (add when going to the Play Store):
+      # - key: GOOGLE_SERVICE_ACCOUNT_JSON
+      # - key: ANDROID_PACKAGE_NAME
+      #   value: app.skillswap.mobile
+
+  - type: web
+    name: skillswap-client
+    runtime: static
+    buildCommand: npm --prefix client install && npm --prefix client run build
+    staticPublishPath: ./client/dist
+    pullRequestPreviewsEnabled: false
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://skillswap-api.onrender.com/api/:splat
+      - type: rewrite
+        source: /socket.io/*
+        destination: https://skillswap-api.onrender.com/socket.io/:splat
+    envVars:
+      - key: VITE_API_URL
+        value: "" # same-origin via the rewrite above

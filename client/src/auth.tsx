@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api, Me } from './api';
+import { api, Me, setToken } from './api';
 
 interface AuthState {
   me: Me | null;
@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.post('/auth/logout');
+    setToken(null);
     setMe(null);
   }, []);
 

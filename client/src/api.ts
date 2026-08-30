@@ -12,9 +12,34 @@ export class ApiError extends Error {
 export const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } })
   .env?.VITE_API_URL || '';
 
+const TOKEN_KEY = 'skillswap_token';
+
+/** Persist the session token for native-app (Bearer) usage. */
+export function setToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export function getToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
   const res = await fetch(`${API_BASE}/api${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
     credentials: 'include',
     ...options,
   });
