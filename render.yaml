@@ -25,11 +25,11 @@ services:
       - key: JWT_SECRET
         generateValue: true # or set your own long random string
       - key: CLIENT_URL
-        sync: false # e.g. https://skillswap.onrender.com (client) or your custom domain
+        value: https://skillswap-client-upag.onrender.com
       - key: SERVER_URL
-        sync: false # e.g. https://skillswap-api.onrender.com
+        value: https://skillswap-api-eqxm.onrender.com
       - key: EXTRA_CORS_ORIGINS
-        sync: false # e.g. https://skillswap-client.onrender.com
+        value: https://skillswap-client-upag.onrender.com
       # Google Play verification (add when going to the Play Store):
       # - key: GOOGLE_SERVICE_ACCOUNT_JSON
       # - key: ANDROID_PACKAGE_NAME
@@ -41,13 +41,8 @@ services:
     buildCommand: npm --prefix client install && npm --prefix client run build
     staticPublishPath: ./client/dist
     pullRequestPreviewsEnabled: false
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://skillswap-api.onrender.com/api/:splat
-      - type: rewrite
-        source: /socket.io/*
-        destination: https://skillswap-api.onrender.com/socket.io/:splat
     envVars:
+      # The browser calls the API directly (cross-origin, with cookies +
+      # Bearer fallback). Render static rewrites can't proxy external hosts.
       - key: VITE_API_URL
-        value: "" # same-origin via the rewrite above
+        value: https://skillswap-api-eqxm.onrender.com
