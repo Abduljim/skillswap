@@ -33,19 +33,22 @@ export function verifyToken(token: string): AuthUser | null {
 export const COOKIE_NAME = 'skillswap_token';
 
 export function setAuthCookie(res: Response, token: string) {
+  const crossSite = env.nodeEnv === 'production'; // client + API on different origins
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: env.nodeEnv === 'production',
+    // Cross-origin (client site -> API domain) cookies need SameSite=None.
+    sameSite: crossSite ? 'none' : 'lax',
+    secure: crossSite,
     maxAge: 30 * 24 * 60 * 60 * 1000,
   });
 }
 
 export function clearAuthCookie(res: Response) {
+  const crossSite = env.nodeEnv === 'production';
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: env.nodeEnv === 'production',
+    sameSite: crossSite ? 'none' : 'lax',
+    secure: crossSite,
   });
 }
 

@@ -34,15 +34,25 @@ export function getToken(): string | null {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${API_BASE}/api${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-    credentials: 'include',
-    ...options,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api${path}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+      credentials: 'include',
+      ...options,
+    });
+  } catch {
+    // Network-level failure: server unreachable, waking from sleep, or
+    // offline. Give the user an actionable message.
+    throw new ApiError(0, 'Cannot reach SkillSwap right now. The server may be waking up — try again in about a minute.');
+  }
+  if (res.status === 502 || res.status === 503) {
+    throw new ApiError(res.status, 'SkillSwap is waking up — this usually takes under a minute. Please try again shortly.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new ApiError(res.status, (data as { error?: string }).error || 'Request failed', (data as { issues?: unknown }).issues);

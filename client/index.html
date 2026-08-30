@@ -14,10 +14,16 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- Android only: defines window.AndroidBilling before the app bundle
-         loads (the file is only packaged inside the APK; on the web this
-         404s silently and billing falls back to its no-op path). -->
-    <script src="/android-billing.js" defer></script>
+    <script>
+      // Only load the Google Play Billing bridge inside the Android app
+      // (Capacitor injects window.Capacitor). On the web this stays silent.
+      if (window.Capacitor) {
+        var s = document.createElement('script');
+        s.src = '/android-billing.js';
+        s.async = false;
+        document.head.appendChild(s);
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
