@@ -70,6 +70,16 @@ jobs:
             sed -i "s/^dependencies {/dependencies {\n    implementation 'com.android.billingclient:billing-ktx:7.1.1'/" "$GRADLE"
           grep -n "billing-ktx" "$GRADLE"
 
+      - name: Resolve Kotlin stdlib duplicates
+        # billing-ktx pulls kotlin-stdlib-jdk8 1.6.21 which clashes with the
+        # 1.8 stdlib Capacitor uses. The jdk7/jdk8 artifacts are folded into
+        # kotlin-stdlib since 1.8, so depend directly on the new one.
+        run: |
+          GRADLE=android/app/build.gradle
+          grep -q 'kotlin-stdlib:1.8.22' "$GRADLE" || \
+            sed -i "s/^dependencies {/dependencies {\n    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.8.22') { }\n    constraints {\n        implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22') { because 'align kotlin versions' }\n        implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22') { because 'align kotlin versions' }\n    }/" "$GRADLE"
+          grep -n "kotlin-stdlib" "$GRADLE"
+
       - name: Sync Capacitor (keep injected files)
         run: npx cap sync android
 
