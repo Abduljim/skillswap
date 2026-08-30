@@ -1,0 +1,119 @@
+# SkillSwap Android (APK + Google Play)
+
+The Android app is the SkillSwap web client packaged with **Capacitor**, with
+native **Google Play Billing** for Gold / Elite subscriptions and boosts.
+
+## Architecture
+
+```
+client/                 React + Vite web app (the single codebase)
+  src/billing.ts        web-side billing bridge (graceful no-op on web)
+  android/              native shell (added by `npx cap add android`)
+    .../PlayBillingBridge.java   Capacitor plugin wrapping Play Billing
+```
+
+**Security model (PRD §13):** the native plugin only returns a
+`purchaseToken` to the web layer. The web layer POSTs it to the SkillSwap
+backend (`POST /api/billing/subscriptions` or `/api/billing/boosts`), and
+the **backend verifies the token with the Google Play Developer API** before
+granting any entitlement. Nothing in the client can grant a tier.
+
+## One-time setup
+
+Prereqs: Node 18+, Android Studio (with SDK 34+), JDK 17.
+
+```bash
+cd client
+npm install
+npm i -D @capacitor/cli @capacitor/core @capacitor/android
+npm run build                      # produces client/dist
+npx cap add android                # generates android/ from capacitor.config.json
+npx cap sync android
+```
+
+Then copy the native plugin in (or keep `android/app/src/main/java/com/
+skillswap/billing/PlayBillingBridge.java` from this repo) and register it in
+`MainActivity.java`:
+
+```java
+public class MainActivity extends BridgeActivity {
+  @Override public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    registerPlugin(PlayBillingBridge.class);
+  }
+}
+```
+
+Add the billing dependency to `android/app/build.gradle`:
+
+```gradle
+dependencies {
+  implementation 'com.android.billingclient:billing-ktx:7.0.0'
+}
+```
+
+## Build a debug APK (sideload / GitHub release)
+
+```bash
+cd client/android
+./gradlew assembleDebug
+# APK at: android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+## Build a release APK / AAB (Play Store)
+
+1. Create an upload keystore (keep it + passwords secret, never commit):
+   ```bash
+   keytool -genkey -v -keystore skillswap-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias skillswap
+   ```
+2. Add signing config to `android/app/build.gradle`.
+3. Build the bundle Play requires:
+   ```bash
+   ./gradlew bundleRelease
+   # AAB at: android/app/build/outputs/bundle/release/app-release.aab
+   ```
+4. Upload the AAB in Play Console → Production → Create release. Play signs
+   the app for distribution automatically.
+
+For **GitHub APK distribution**, additionally run `./gradlew assembleRelease`
+and attach `app-release.apk` to a GitHub Release (Play-signed AABs can't be
+sideloaded, so a self-signed release APK is the artifact to publish there).
+
+## Google Play products (create in Play Console → Monetize → Products)
+
+| Product ID | Type | Tier |
+|---|---|---|
+| `skillswap_gold_monthly` | Subscription | Gold |
+| `skillswap_gold_yearly` | Subscription | Gold |
+| `skillswap_elite_monthly` | Subscription | Elite |
+| `skillswap_elite_yearly` | Subscription | Elite |
+| `skillswap_match_boost` | In-app product | Boost |
+| `skillswap_spotlight` | In-app product | Boost |
+| `skillswap_weekly_spotlight` | In-app product | Boost |
+
+Prices are configured in Play Console **and** mirrored in the SkillSwap
+`SubscriptionProduct` / `BoostProduct` tables for display. Play is the
+source of truth at checkout.
+
+## Server-side purchase verification
+
+Set these on the server (never in the client):
+
+```
+GOOGLE_SERVICE_ACCOUNT_JSON={"client_email":"...","private_key":"..."}
+ANDROID_PACKAGE_NAME=app.skillswap.mobile
+```
+
+Create the service account in Google Cloud, grant it access in Play Console
+(Users & permissions → View app information), and share the JSON. Without
+credentials, and outside production, the server runs in **dev billing mode**
+(signature-checked dev tokens) so the flow is testable. In
+`NODE_ENV=production` verification **fails closed** without real credentials.
+
+## Play Console release checklist
+
+- App content: privacy policy URL, data safety form (account, minimal analytics)
+- Content rating questionnaire
+- Target audience: 13+ (university community)
+- Upload AAB → internal testing track first, then production
+- Subscriptions must be active with correct base plans + offers before review

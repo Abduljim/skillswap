@@ -1,0 +1,17 @@
+{
+  "name": "skillswap",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Trade what you know for what you want to learn.",
+  "scripts": {
+    "setup": "npm --prefix server install && npm --prefix client install",
+    "db:migrate": "npm --prefix server run db:migrate",
+    "db:seed": "npm --prefix server run db:seed",
+    "dev": "concurrently -n server,client -c blue,magenta \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "test": "npm --prefix server run test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

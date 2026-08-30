@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Builds
+client/dist/
+server/dist/
+client/android/app/build/
+client/android/.gradle/
+client/android/build/
+client/android/local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Secrets & environment
+.env
+server/.env
+client/.env
+.env.local
+.env.*.local
+serviceAccount*.json
+
+# Prisma
+server/prisma/*.db
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Capacitor generated assets (regenerated via npx cap sync)
+client/android/app/src/main/assets/public/
+client/android/capacitor-cordova-android-plugins/
+
+# stray output logs
+*_out.txt

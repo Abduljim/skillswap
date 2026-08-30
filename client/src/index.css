@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-cream-50 text-ink-900 antialiased;
+  }
+  body {
+    @apply font-sans;
+  }
+  ::selection {
+    @apply bg-coral-200;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-coral-400 ring-offset-2 ring-offset-cream-50 rounded-md;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold
+      transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-coral-500 text-white hover:bg-coral-600 shadow-soft;
+  }
+  .btn-dark {
+    @apply btn bg-ink-900 text-cream-50 hover:bg-ink-800 shadow-soft;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-ink-700 hover:bg-ink-100/70;
+  }
+  .btn-outline {
+    @apply btn border border-ink-200 bg-white text-ink-800 hover:border-ink-400 shadow-soft;
+  }
+  .btn-gold {
+    @apply btn bg-gradient-to-r from-amber-400 to-yellow-500 text-ink-900 hover:from-amber-500 hover:to-yellow-600 shadow-soft;
+  }
+  .btn-elite {
+    @apply btn bg-ink-900 text-violet-100 border border-violet-400/50 hover:bg-ink-800 shadow-soft;
+  }
+  .card {
+    @apply bg-white rounded-3xl shadow-soft border border-ink-100/60;
+  }
+  .card-gold {
+    @apply bg-gradient-to-br from-amber-50/80 to-white rounded-3xl shadow-soft border border-amber-200;
+  }
+  .card-elite {
+    @apply bg-gradient-to-br from-ink-900 to-ink-800 rounded-3xl shadow-lift border border-violet-400/40 text-cream-50;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-transform;
+  }
+  .chip-teach {
+    @apply chip bg-mint-100 text-mint-500;
+  }
+  .chip-want {
+    @apply chip bg-lavender-100 text-lavender-500;
+  }
+  .input {
+    @apply w-full rounded-2xl border border-ink-200 bg-white px-4 py-3 text-sm
+      placeholder:text-ink-300 focus:border-coral-400 focus:ring-2 focus:ring-coral-200 outline-none transition;
+  }
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wider text-ink-400 mb-1.5;
+  }
+  .skeleton {
+    @apply animate-pulse-soft rounded-2xl bg-ink-100;
+  }
+  .shadow-soft-gold {
+    box-shadow: 0 4px 14px -2px rgba(217, 158, 33, 0.35);
+  }
+  .shadow-soft-elite {
+    box-shadow: 0 4px 16px -2px rgba(124, 58, 237, 0.4);
+  }
+}
+
+/* Elite frame: subtle luminous shimmer, disabled for reduced motion. */
+@keyframes elite-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.elite-shimmer {
+  background-size: 200% 200%;
+  animation: elite-shimmer 6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .elite-shimmer {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

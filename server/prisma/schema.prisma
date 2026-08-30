@@ -1,0 +1,529 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Tier {
+  FREE
+  GOLD
+  ELITE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAUSED
+  IN_GRACE_PERIOD
+  ON_HOLD
+}
+
+enum SubscriptionProvider {
+  GOOGLE_PLAY
+}
+
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
+enum BoostType {
+  MATCH_BOOST
+  SPOTLIGHT
+  WEEKLY_SPOTLIGHT
+}
+
+enum BoostStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+  REWARDED
+}
+
+enum SkillType {
+  TEACH
+  WANT
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum LearningFormat {
+  ONLINE
+  IN_PERSON
+  EITHER
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum ExchangeStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String
+  displayName    String
+  role           Role     @default(USER)
+  isActive       Boolean  @default(true)
+  completedCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  profile          Profile?
+  skills           UserSkill[]
+  requestsSent     ExchangeRequest[] @relation("RequestSender")
+  requestsReceived ExchangeRequest[] @relation("RequestRecipient")
+  exchangesAsA     Exchange[]        @relation("ExchangeUserA")
+  exchangesAsB     Exchange[]        @relation("ExchangeUserB")
+  messages         Message[]
+  reviewsWritten   Review[]          @relation("ReviewAuthor")
+  reviewsReceived  Review[]          @relation("ReviewTarget")
+  notifications    Notification[]
+  reportsMade      Report[]          @relation("ReportReporter")
+  reportsReceived  Report[]          @relation("ReportTarget")
+  blocksInitiated  Block[]           @relation("Blocker")
+  blocksReceived   Block[]           @relation("BlockedTarget")
+
+  subscriptions     Subscription[]
+  boosts            UserBoost[]
+  usageCounters     UsageCounter[]
+  savedMatches      SavedMatch[]
+  profileViews      ProfileView[]    @relation("ProfileViewViewer")
+  profileViewed     ProfileView[]    @relation("ProfileViewTarget")
+  analyticsEvents   AnalyticsEvent[]
+  referralsMade     Referral[]       @relation("ReferralReferrer")
+  referralsJoined   Referral[]       @relation("ReferralReferred")
+  referralCode      String?          @unique
+  spotlightCredits  Int              @default(0)
+  spotlightRuns     SpotlightRun[]
+  purchases         PurchaseRecord[]
+  savedMatchTargets SavedMatch[]     @relation("SavedMatchTarget")
+
+  @@index([displayName])
+  @@index([isActive])
+}
+
+model Profile {
+  id          String         @id @default(uuid())
+  userId      String         @unique
+  bio         String?
+  university  String?
+  department  String?
+  year        String?
+  avatarColor String         @default("coral")
+  format      LearningFormat @default(EITHER)
+  days        String[]       @default([])
+  dayParts    String[]       @default([])
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([university])
+}
+
+model Skill {
+  id       String      @id @default(uuid())
+  name     String      @unique
+  category String
+  users    UserSkill[]
+
+  @@index([category])
+}
+
+model UserSkill {
+  id        String    @id @default(uuid())
+  userId    String
+  skillId   String
+  type      SkillType
+  level     Level     @default(BEGINNER)
+  createdAt DateTime  @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId, type])
+  @@index([skillId])
+}
+
+model ExchangeRequest {
+  id           String        @id @default(uuid())
+  senderId     String
+  recipientId  String
+  message      String
+  skillOffered String?
+  skillWanted  String?
+  status       RequestStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  sender     User      @relation("RequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient  User      @relation("RequestRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  exchangeId String?   @unique
+  exchange   Exchange?
+
+  @@unique([senderId, recipientId])
+  @@index([recipientId, status])
+  @@index([senderId, status])
+}
+
+model Exchange {
+  id            String         @id @default(uuid())
+  userAId       String
+  userBId       String
+  skillATeaches String
+  skillBTeaches String
+  status        ExchangeStatus @default(ACTIVE)
+  completeA     Boolean        @default(false)
+  completeB     Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  completedAt   DateTime?
+  requestId     String?        @unique
+
+  userA    User             @relation("ExchangeUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User             @relation("ExchangeUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  request  ExchangeRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  sessions Session[]
+  messages Message[]
+  reviews  Review[]
+
+  @@index([userAId, status])
+  @@index([userBId, status])
+}
+
+model Session {
+  id              String         @id @default(uuid())
+  exchangeId      String
+  createdBy       String
+  title           String
+  scheduledAt     DateTime
+  durationMinutes Int            @default(60)
+  mode            LearningFormat @default(ONLINE)
+  meetingLink     String?
+  location        String?
+  notes           String?
+  status          SessionStatus  @default(SCHEDULED)
+  createdAt       DateTime       @default(now())
+
+  exchange Exchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+
+  @@index([exchangeId, scheduledAt])
+}
+
+model Message {
+  id         String    @id @default(uuid())
+  exchangeId String
+  senderId   String
+  content    String
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  exchange Exchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+  sender   User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([exchangeId, createdAt])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  exchangeId String
+  reviewerId String
+  revieweeId String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  exchange Exchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+  reviewer User     @relation("ReviewAuthor", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee User     @relation("ReviewTarget", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  @@unique([exchangeId, reviewerId])
+  @@index([revieweeId])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model Report {
+  id         String       @id @default(uuid())
+  reporterId String
+  targetId   String
+  reason     String
+  details    String?
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+
+  reporter User @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  target   User @relation("ReportTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedTarget", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+}
+
+// ---------------------------------------------------------------------------
+// Monetization
+// ---------------------------------------------------------------------------
+
+/// Catalogue of purchasable subscription plans (configurable, never hardcoded
+/// in the frontend). Display prices are informational; Google Play is the
+/// source of truth for what the user actually pays.
+model SubscriptionProduct {
+  id              String        @id @default(uuid())
+  tier            Tier
+  billingPeriod   BillingPeriod
+  googleProductId String        @unique
+  displayPrice    String
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  subscriptions Subscription[]
+
+  @@unique([tier, billingPeriod])
+  @@index([tier])
+}
+
+/// A user's verified subscription state. Entitlements are computed from these
+/// rows server-side; the frontend is never trusted.
+model Subscription {
+  id                     String               @id @default(uuid())
+  userId                 String
+  tier                   Tier
+  status                 SubscriptionStatus
+  provider               SubscriptionProvider @default(GOOGLE_PLAY)
+  providerSubscriptionId String?
+  productId              String?
+  basePlanId             String?
+  purchaseToken          String?              @unique
+  startedAt              DateTime
+  expiresAt              DateTime?
+  autoRenew              Boolean              @default(true)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  user    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product SubscriptionProduct? @relation(fields: [productId], references: [id])
+
+  @@index([userId, status])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+/// Raw Google Play purchase records kept for audit + verification.
+model PurchaseRecord {
+  id              String   @id @default(uuid())
+  userId          String
+  kind            String // 'subscription' | 'boost'
+  googleProductId String
+  purchaseToken   String   @unique
+  purchaseState   String
+  acknowledged    Boolean  @default(false)
+  orderId         String?
+  rawPayload      Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([googleProductId])
+}
+
+/// Catalogue of one-time boost products.
+model BoostProduct {
+  id              String    @id @default(uuid())
+  name            String
+  description     String
+  type            BoostType
+  durationHours   Int
+  price           Int // kobo (100 kobo = ₦1)
+  googleProductId String    @unique
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  boosts UserBoost[]
+
+  @@index([type])
+}
+
+/// A user's purchased boost.
+model UserBoost {
+  id             String      @id @default(uuid())
+  userId         String
+  boostProductId String
+  startsAt       DateTime    @default(now())
+  expiresAt      DateTime
+  status         BoostStatus @default(ACTIVE)
+  purchaseToken  String?     @unique
+  createdAt      DateTime    @default(now())
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product BoostProduct @relation(fields: [boostProductId], references: [id])
+
+  @@index([userId, status])
+  @@index([expiresAt, status])
+}
+
+/// Featured placement purchased with Elite spotlight credits or a Spotlight
+/// boost. Clearly labelled SPOTLIGHT — never disguised as organic ranking.
+model SpotlightRun {
+  id        String   @id @default(uuid())
+  userId    String
+  startsAt  DateTime @default(now())
+  expiresAt DateTime
+  source    String   @default("credit") // 'credit' | 'boost'
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, expiresAt])
+}
+
+/// Monthly usage counters enforcing Free-tier limits. Counters roll over on
+/// first use in a new (month, year) window.
+model UsageCounter {
+  id        String   @id @default(uuid())
+  userId    String
+  key       String // 'request_sent' | 'match_unlock' | 'saved_match'
+  count     Int      @default(0)
+  month     Int
+  year      Int
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key, month, year])
+  @@index([userId, month, year])
+}
+
+/// Saved matches ("bookmark" a person for later). Limited for Free users.
+model SavedMatch {
+  id        String   @id @default(uuid())
+  userId    String
+  targetId  String
+  createdAt DateTime @default(now())
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  target User @relation("SavedMatchTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId])
+}
+
+/// Expanded match unlocks for Free users. One unlock per unique target per
+/// monthly window; revisiting an already-unlocked match is always free.
+model MatchUnlock {
+  id        String   @id @default(uuid())
+  userId    String
+  targetId  String
+  month     Int
+  year      Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, targetId, month, year])
+  @@index([userId, month, year])
+}
+
+/// Aggregated profile-view log powering Gold/Elite analytics. Only aggregated
+/// statistics are ever exposed — never individual viewer identities.
+model ProfileView {
+  id        String   @id @default(uuid())
+  targetId  String
+  viewerId  String
+  createdAt DateTime @default(now())
+
+  target User @relation("ProfileViewTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  viewer User @relation("ProfileViewViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@index([targetId, createdAt])
+}
+
+/// Product analytics events (no unnecessary personal information).
+model AnalyticsEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  name      String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([name, createdAt])
+}
+
+/// Referral program: both sides get a Match Boost after the referred user
+/// completes onboarding. Never unlimited premium access.
+model Referral {
+  id             String         @id @default(uuid())
+  referrerId     String
+  referredUserId String         @unique
+  status         ReferralStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+  completedAt    DateTime?
+
+  referrer User @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User @relation("ReferralReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+}

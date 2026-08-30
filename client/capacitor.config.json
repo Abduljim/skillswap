@@ -1,0 +1,12 @@
+{
+  "appId": "app.skillswap.mobile",
+  "appName": "SkillSwap",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
