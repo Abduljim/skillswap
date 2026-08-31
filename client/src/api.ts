@@ -32,32 +32,66 @@ export function getToken(): string | null {
   }
 }
 
+/** Is this failure a "server waking up" transient rather than a real error? */
+function isTransient(status: number): boolean {
+  return status === 0 || status === 502 || status === 503 || status === 504;
+}
+
+async function fetchOnce(path: string, options: RequestInit, token: string | null): Promise<Response> {
+  return fetch(`${API_BASE}/api${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+    credentials: 'include',
+    ...options,
+  });
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}/api${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
-      },
-      credentials: 'include',
-      ...options,
-    });
-  } catch {
-    // Network-level failure: server unreachable, waking from sleep, or
-    // offline. Give the user an actionable message.
-    throw new ApiError(0, 'Cannot reach SkillSwap right now. The server may be waking up — try again in about a minute.');
+
+  // Free-host cold starts return 502/503 or drop the connection for ~30-60s.
+  // Retry automatically so wake-ups are invisible to the user.
+  const MAX_ATTEMPTS = 4;
+  let lastError: ApiError | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let res: Response;
+    try {
+      res = await fetchOnce(path, options, token);
+    } catch {
+      lastError = new ApiError(
+        0,
+        attempt < MAX_ATTEMPTS
+          ? 'Waking up SkillSwap…'
+          : 'Cannot reach SkillSwap right now. The server may be waking up — try again in about a minute.'
+      );
+      if (attempt === MAX_ATTEMPTS) throw lastError;
+      await new Promise((r) => setTimeout(r, attempt * 8000)); // 8s, 16s, 24s
+      continue;
+    }
+    if (isTransient(res.status)) {
+      lastError = new ApiError(res.status, 'Waking up SkillSwap…');
+      if (attempt === MAX_ATTEMPTS) throw lastError;
+      await new Promise((r) => setTimeout(r, attempt * 8000));
+      continue;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new ApiError(
+        res.status,
+        (data as { error?: string }).error || 'Request failed',
+        (data as { issues?: unknown }).issues
+      );
+    }
+    return data as T;
   }
-  if (res.status === 502 || res.status === 503) {
-    throw new ApiError(res.status, 'SkillSwap is waking up — this usually takes under a minute. Please try again shortly.');
-  }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new ApiError(res.status, (data as { error?: string }).error || 'Request failed', (data as { issues?: unknown }).issues);
-  }
-  return data as T;
+  throw (
+    lastError ??
+    new ApiError(0, 'Cannot reach SkillSwap right now. The server may be waking up — try again in about a minute.')
+  );
 }
 
 export const api = {
