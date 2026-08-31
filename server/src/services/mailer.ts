@@ -25,6 +25,11 @@ function getTransport(): nodemailer.Transporter | null {
     port: env.smtp.port,
     secure: env.smtp.port === 465,
     auth: { user: env.smtp.user as string, pass: env.smtp.pass as string },
+    // Fail fast instead of hanging the request when the SMTP provider is
+    // unreachable or credentials are rejected.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
   return cachedTransport;
 }
@@ -44,14 +49,20 @@ export async function sendMail(message: MailMessage): Promise<{ sent: boolean; p
     console.log(preview);
     return { sent: false, preview };
   }
-  await transport.sendMail({
-    from: env.smtp.from,
-    to: message.to,
-    subject: message.subject,
-    text: message.text,
-    html: message.html,
-  });
-  return { sent: true };
+  try {
+    await transport.sendMail({
+      from: env.smtp.from,
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+    });
+    return { sent: true };
+  } catch (err) {
+    // Never hang or crash the request on mail failure — log it for debugging.
+    console.error('[mailer] send failed:', err instanceof Error ? err.message : err);
+    return { sent: false };
+  }
 }
 
 /** Branded password-reset email. */
