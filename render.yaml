@@ -30,6 +30,8 @@ services:
         value: https://skillswap-api-eqxm.onrender.com
       - key: EXTRA_CORS_ORIGINS
         value: https://skillswap-client-upag.onrender.com
+      # Email (SMTP) for password recovery — set these in the dashboard:
+      # SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM
       # Google Play verification (add when going to the Play Store):
       # - key: GOOGLE_SERVICE_ACCOUNT_JSON
       # - key: ANDROID_PACKAGE_NAME

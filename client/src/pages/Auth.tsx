@@ -119,14 +119,16 @@ export function Signup() {
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
-  const [result, setResult] = useState<{ resetToken?: string } | null>(null);
+  const [result, setResult] = useState<{ resetToken?: string; note?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
-      const data = await api.post<{ resetToken?: string }>('/auth/forgot-password', { email });
+      const data = await api.post<{ ok: boolean; resetToken?: string; note?: string }>('/auth/forgot-password', { email });
       setResult(data);
+    } catch {
+      setResult({}); // never reveal whether the account exists
     } finally {
       setBusy(false);
     }
@@ -135,7 +137,10 @@ export function ForgotPassword() {
     <Shell title="Reset your password" subtitle="We'll help you get back in.">
       {result ? (
         <div className="text-sm space-y-3">
-          <p className="text-ink-500">If an account exists for {email}, a reset link has been generated.</p>
+          <p className="text-ink-500">
+            If an account exists for <strong>{email}</strong>, a reset link is on its way.
+            Check your inbox (and spam folder).
+          </p>
           {result.resetToken && (
             <p className="text-xs text-ink-400 break-all">
               Dev mode reset token:{' '}
@@ -144,6 +149,7 @@ export function ForgotPassword() {
               </Link>
             </p>
           )}
+          {result.note && <p className="text-[10px] text-ink-300">{result.note}</p>}
           <Link to="/login" className="btn-outline w-full">Back to login</Link>
         </div>
       ) : (

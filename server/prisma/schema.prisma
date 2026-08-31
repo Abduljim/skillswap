@@ -131,13 +131,14 @@ model User {
   profileViews      ProfileView[]    @relation("ProfileViewViewer")
   profileViewed     ProfileView[]    @relation("ProfileViewTarget")
   analyticsEvents   AnalyticsEvent[]
-  referralsMade     Referral[]       @relation("ReferralReferrer")
-  referralsJoined   Referral[]       @relation("ReferralReferred")
-  referralCode      String?          @unique
-  spotlightCredits  Int              @default(0)
-  spotlightRuns     SpotlightRun[]
-  purchases         PurchaseRecord[]
+  referralsMade    Referral[]        @relation("ReferralReferrer")
+  referralsJoined  Referral[]        @relation("ReferralReferred")
+  referralCode     String?           @unique
+  spotlightCredits Int               @default(0)
+  spotlightRuns    SpotlightRun[]
+  purchases        PurchaseRecord[]
   savedMatchTargets SavedMatch[]     @relation("SavedMatchTarget")
+  passwordResets   PasswordReset[]
 
   @@index([displayName])
   @@index([isActive])
@@ -526,4 +527,20 @@ model Referral {
   referred User @relation("ReferralReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
 
   @@index([referrerId])
+}
+
+/// Persisted password-reset tokens. Survives server restarts (the previous
+/// in-memory store was lost on every deploy). Only a SHA-256 hash is stored.
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

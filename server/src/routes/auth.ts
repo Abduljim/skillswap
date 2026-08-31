@@ -21,6 +21,7 @@ import {
 import { getEntitlement } from '../services/entitlements';
 import { trackEvent } from '../services/analytics';
 import { completeReferral } from './billing';
+import { sendMail, passwordResetEmail, mailConfigured } from '../services/mailer';
 
 const router = Router();
 
@@ -104,44 +105,64 @@ router.get('/me', requireAuth, async (req, res) => {
 });
 
 /**
- * Forgot password. Without an email provider, we return the reset token
- * directly in development so the flow is testable end-to-end.
+ * Forgot password. Always returns ok (never reveals account existence).
+ * Sends a branded reset email via SMTP when configured; in development the
+ * reset link is also returned in the response so the flow is testable.
  */
 router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res) => {
   const { email } = req.body;
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    // Do not reveal account existence.
-    return res.json({ ok: true });
+
+  if (user) {
+    // Invalidate any previous pending tokens for this user.
+    await prisma.passwordReset.updateMany({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 3600_000); // 1 hour
+
+    await prisma.passwordReset.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+
+    const resetUrl = `${env.clientUrl}/reset-password?token=${token}`;
+    const mail = passwordResetEmail(resetUrl, user.displayName);
+    await sendMail({ to: user.email, ...mail });
+
+    return res.json({
+      ok: true,
+      // Dev convenience only — never leak the token in production.
+      ...(env.nodeEnv !== 'production' ? { resetToken: token } : {}),
+      ...(mailConfigured() ? {} : { note: 'SMTP not configured; email logged to server console.' }),
+    });
   }
-  const token = crypto.randomBytes(32).toString('hex');
-  const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  getResets().set(resetTokenHash, { userId: user.id, expires: Date.now() + 3600_000 });
-  res.json({
-    ok: true,
-    ...(env.nodeEnv !== 'production' ? { resetToken: token } : {}),
-  });
+
+  // Do not reveal account existence.
+  return res.json({ ok: true });
 });
 
 router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
   const { token, password } = req.body;
-  const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const entry = getResets().get(resetTokenHash);
-  if (!entry || entry.expires < Date.now()) {
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const entry = await prisma.passwordReset.findUnique({
+    where: { tokenHash },
+    include: { user: true },
+  });
+  if (!entry || entry.usedAt || entry.expiresAt.getTime() < Date.now()) {
     throw new HttpError(400, 'Invalid or expired reset token');
   }
+
   const passwordHash = await bcrypt.hash(password, 10);
-  await prisma.user.update({ where: { id: entry.userId }, data: { passwordHash } });
-  getResets().delete(resetTokenHash);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: entry.userId }, data: { passwordHash } }),
+    prisma.passwordReset.update({ where: { id: entry.id }, data: { usedAt: new Date() } }),
+  ]);
+
   res.json({ ok: true });
 });
-
-function getResets(): Map<string, { userId: string; expires: number }> {
-  const g = globalThis as unknown as {
-    __passwordResets?: Map<string, { userId: string; expires: number }>;
-  };
-  if (!g.__passwordResets) g.__passwordResets = new Map();
-  return g.__passwordResets;
-}
 
 export default router;
