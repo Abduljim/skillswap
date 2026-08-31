@@ -3,6 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+// Makes Express 4 catch errors thrown in async route handlers — without it,
+// any HttpError in an async handler crashes the process (production 502s).
+import 'express-async-errors';
 import { env } from './lib/env';
 import { HttpError } from './middleware/validate';
 
